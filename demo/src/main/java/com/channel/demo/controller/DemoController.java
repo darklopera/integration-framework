@@ -71,7 +71,7 @@ public class DemoController {
         return ResponseEntity.ok(Map.of("service", "payments-core", "state", state,
             "description", switch (state) {
                 case "CLOSED" -> "Normal — all calls allowed";
-                case "OPEN" -> "Fail-fast active — all calls rejected";
+                case "OPEN"   -> "Fail-fast active — all calls rejected";
                 case "HALF_OPEN" -> "Probing recovery";
                 default -> state;
             }));
@@ -81,7 +81,10 @@ public class DemoController {
     @PostMapping("/circuit-breaker/reset")
     public ResponseEntity<Map<String, String>> resetCircuitBreaker() {
         paymentService.resetCircuitBreaker();
-        return ResponseEntity.ok(Map.of("message", "Circuit Breaker reset to CLOSED", "state", paymentService.getCircuitBreakerState()));
+        return ResponseEntity.ok(Map.of(
+            "message", "Circuit Breaker reset to CLOSED",
+            "state", paymentService.getCircuitBreakerState()
+        ));
     }
 
     @Operation(summary = "Change upstream failure mode",
@@ -93,13 +96,14 @@ public class DemoController {
             flakyUpstream.setMode(newMode);
             return ResponseEntity.ok(Map.of("mode", newMode.name(), "message", "Mode changed",
                 "tip", switch (newMode) {
-                    case ALWAYS_FAIL -> "Call /demo/payment ~6x to trip the Circuit Breaker";
-                    case SLOW_RESPONSE -> "Call /demo/payment to see TIMEOUT (8s > 6s limit)";
+                    case ALWAYS_FAIL    -> "Call /demo/payment ~6x to trip the Circuit Breaker";
+                    case SLOW_RESPONSE  -> "Call /demo/payment to see TIMEOUT (8s > 6s limit)";
                     case RANDOM_FAILURE -> "Call /demo/payment to see Retry + Backoff";
-                    case HEALTHY -> "Call /demo/payment to see successful recovery";
+                    case HEALTHY        -> "Call /demo/payment to see successful recovery";
                 }));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Valid modes: RANDOM_FAILURE | ALWAYS_FAIL | SLOW_RESPONSE | HEALTHY"));
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Valid modes: RANDOM_FAILURE | ALWAYS_FAIL | SLOW_RESPONSE | HEALTHY"));
         }
     }
 
@@ -118,55 +122,95 @@ public class DemoController {
     @PostMapping("/run-all-tests")
     public ResponseEntity<Map<String, Object>> runAllTests() {
         List<Map<String, Object>> results = new ArrayList<>();
+
+        // ── Clean slate before every run ──────────────────────────────────────
+        // The Circuit Breaker is a singleton with a 10-second sliding window.
+        // Failures from TEST_2 (RANDOM_FAILURE) accumulate in that window and can
+        // push the error rate above the 50% threshold before TEST_4 fires its timeout,
+        // causing CircuitBreakerOpenException instead of CallTimeoutException.
+        // Resetting here guarantees each run starts from a known, deterministic state.
         flakyUpstream.setMode(FlakyUpstreamService.Mode.HEALTHY);
         paymentService.resetCircuitBreaker();
 
-        // Test 1 — Normal flow
+        // ── TEST 1 — Normal flow ──────────────────────────────────────────────
         results.add(runTest("TEST_1", "Normal flow (healthy upstream)", "HEALTHY", () -> {
             flakyUpstream.setMode(FlakyUpstreamService.Mode.HEALTHY);
             IntegrationResponse<String> r = paymentService.processPayment("PAY-T1", UUID.randomUUID().toString());
-            return Map.of("outcome", "SUCCESS", "result", r.getResult(), "durationMs", r.getDurationMs(), "pattern", "FULL_PIPELINE");
+            return Map.of(
+                "outcome", "SUCCESS",
+                "result", r.getResult(),
+                "durationMs", r.getDurationMs(),
+                "pattern", "FULL_PIPELINE"
+            );
         }));
 
-        // Test 2 — Retry
+        // ── TEST 2 — Retry + Exponential Backoff + Jitter ────────────────────
         results.add(runTest("TEST_2", "Retry + Exponential Backoff + Jitter (50% failure)", "RANDOM_FAILURE", () -> {
             flakyUpstream.setMode(FlakyUpstreamService.Mode.RANDOM_FAILURE);
             try {
                 IntegrationResponse<String> r = paymentService.processPayment("PAY-T2", UUID.randomUUID().toString());
-                return Map.of("outcome", "SUCCESS_AFTER_RETRY", "result", r.getResult(), "pattern", "RETRY + BACKOFF + JITTER");
+                return Map.of(
+                    "outcome", "SUCCESS_AFTER_RETRY",
+                    "result", r.getResult(),
+                    "pattern", "RETRY + BACKOFF + JITTER"
+                );
             } catch (RetryExhaustedException ex) {
-                return Map.of("outcome", "RETRY_EXHAUSTED", "attempts", ex.getTotalAttempts(), "pattern", "RETRY + BACKOFF + JITTER");
+                return Map.of(
+                    "outcome", "RETRY_EXHAUSTED",
+                    "attempts", ex.getTotalAttempts(),
+                    "pattern", "RETRY + BACKOFF + JITTER"
+                );
             }
         }));
 
-        // Test 3 — Idempotency
+        // ── TEST 3 — Idempotency Key ──────────────────────────────────────────
         results.add(runTest("TEST_3", "Idempotency Key — same key twice returns cached", "HEALTHY", () -> {
             flakyUpstream.setMode(FlakyUpstreamService.Mode.HEALTHY);
             String key = "IDEM-" + UUID.randomUUID().toString().substring(0, 6);
             IntegrationResponse<String> first  = paymentService.processPayment("PAY-T3A", key);
             IntegrationResponse<String> second = paymentService.processPayment("PAY-T3B", key);
-            return Map.of("pattern", "IDEMPOTENCY_KEY", "idempotencyKey", key,
+            return Map.of(
+                "pattern", "IDEMPOTENCY_KEY",
+                "idempotencyKey", key,
                 "firstCall",  Map.of("fromCache", first.isFromCache(),  "result", first.getResult()),
                 "secondCall", Map.of("fromCache", second.isFromCache(), "result", second.getResult()),
-                "outcome", second.isFromCache() ? "IDEMPOTENCY_HIT PASS" : "IDEMPOTENCY_MISS FAIL");
+                "outcome", second.isFromCache() ? "IDEMPOTENCY_HIT PASS" : "IDEMPOTENCY_MISS FAIL"
+            );
         }));
 
-        // Test 4 — Timeout
+        // ── TEST 4 — Timeout ──────────────────────────────────────────────────
+        // IMPORTANT: reset the CB before this test.
+        // TEST_2 may have recorded failures inside the 10-second sliding window.
+        // Without this reset, the accumulated error rate can exceed 50% and cause
+        // the CB to open, making this test receive CircuitBreakerOpenException
+        // instead of the expected CallTimeoutException.
+        paymentService.resetCircuitBreaker();
+
         results.add(runTest("TEST_4", "Timeout — upstream 8s > configured 6s", "SLOW_RESPONSE", () -> {
             flakyUpstream.setMode(FlakyUpstreamService.Mode.SLOW_RESPONSE);
             try {
                 paymentService.processPayment("PAY-T4", UUID.randomUUID().toString());
                 return Map.of("outcome", "UNEXPECTED_SUCCESS");
             } catch (CallTimeoutException ex) {
-                return Map.of("outcome", "TIMEOUT PASS", "pattern", "TIMEOUT", "detail", ex.getMessage());
+                return Map.of(
+                    "outcome", "TIMEOUT PASS",
+                    "pattern", "TIMEOUT",
+                    "detail", ex.getMessage()
+                );
+            } catch (CircuitBreakerOpenException ex) {
+                // Safety net: should not happen after the reset above.
+                // Captured here to surface a clear diagnostic if state contamination persists.
+                return Map.of(
+                    "outcome", "CB_OPEN_UNEXPECTED — state contamination detected",
+                    "detail", ex.getMessage()
+                );
             }
         }));
 
-        // Reset for CB tests
+        // ── TEST 5 — Circuit Breaker trip ─────────────────────────────────────
         flakyUpstream.setMode(FlakyUpstreamService.Mode.ALWAYS_FAIL);
         paymentService.resetCircuitBreaker();
 
-        // Test 5 — Trip CB
         results.add(runTest("TEST_5", "Circuit Breaker trip (ALWAYS_FAIL x6)", "ALWAYS_FAIL", () -> {
             flakyUpstream.setMode(FlakyUpstreamService.Mode.ALWAYS_FAIL);
             paymentService.resetCircuitBreaker();
@@ -176,11 +220,15 @@ public class DemoController {
                 catch (Exception ignored) { failures++; }
             }
             String state = paymentService.getCircuitBreakerState();
-            return Map.of("outcome", "OPEN".equals(state) ? "CB_OPEN PASS" : "CB_NOT_OPEN FAIL",
-                "pattern", "CIRCUIT_BREAKER", "failuresRecorded", failures, "finalState", state);
+            return Map.of(
+                "outcome", "OPEN".equals(state) ? "CB_OPEN PASS" : "CB_NOT_OPEN FAIL",
+                "pattern", "CIRCUIT_BREAKER",
+                "failuresRecorded", failures,
+                "finalState", state
+            );
         }));
 
-        // Test 6 — Fail-fast
+        // ── TEST 6 — Fail-fast (CB already OPEN from TEST 5) ─────────────────
         results.add(runTest("TEST_6", "Fail-fast — CB OPEN, instant rejection", "ALWAYS_FAIL (CB OPEN)", () -> {
             long start = System.currentTimeMillis();
             try {
@@ -188,36 +236,57 @@ public class DemoController {
                 return Map.of("outcome", "UNEXPECTED_SUCCESS");
             } catch (CircuitBreakerOpenException ex) {
                 long ms = System.currentTimeMillis() - start;
-                return Map.of("outcome", "FAIL_FAST PASS", "pattern", "CIRCUIT_BREAKER",
-                    "rejectionMs", ms, "noUpstreamCall", ms < 100);
+                return Map.of(
+                    "outcome", "FAIL_FAST PASS",
+                    "pattern", "CIRCUIT_BREAKER",
+                    "rejectionMs", ms,
+                    "noUpstreamCall", ms < 100
+                );
             }
         }));
 
-        // Test 7 — Recovery
+        // ── TEST 7 — Recovery ─────────────────────────────────────────────────
         results.add(runTest("TEST_7", "Recovery — reset CB + healthy upstream", "HEALTHY", () -> {
             flakyUpstream.setMode(FlakyUpstreamService.Mode.HEALTHY);
             paymentService.resetCircuitBreaker();
             IntegrationResponse<String> r = paymentService.processPayment("PAY-T7", UUID.randomUUID().toString());
-            return Map.of("outcome", "RECOVERY_SUCCESS PASS", "result", r.getResult(),
-                "cbState", paymentService.getCircuitBreakerState(), "pattern", "FULL_PIPELINE");
+            return Map.of(
+                "outcome", "RECOVERY_SUCCESS PASS",
+                "result", r.getResult(),
+                "cbState", paymentService.getCircuitBreakerState(),
+                "pattern", "FULL_PIPELINE"
+            );
         }));
 
-        long passed = results.stream().filter(r -> r.get("status").equals("PASSED")).count();
+        // ── Summary ───────────────────────────────────────────────────────────
+        long passed = results.stream().filter(r -> "PASSED".equals(r.get("status"))).count();
         return ResponseEntity.ok(Map.of(
-            "summary", Map.of("total", results.size(), "passed", passed, "failed", results.size() - passed),
-            "patternsVerified", List.of("Timeout", "Retry+Backoff+Jitter", "CircuitBreaker", "Idempotency", "UnifiedLogging", "OTelTracing", "CentralizedConfig"),
+            "summary", Map.of(
+                "total",  results.size(),
+                "passed", passed,
+                "failed", results.size() - passed
+            ),
+            "patternsVerified", List.of(
+                "Timeout", "Retry+Backoff+Jitter", "CircuitBreaker",
+                "Idempotency", "UnifiedLogging", "OTelTracing", "CentralizedConfig"
+            ),
             "results", results
         ));
     }
 
+    // ── Helper ────────────────────────────────────────────────────────────────
     private Map<String, Object> runTest(String id, String name, String mode, TestSupplier supplier) {
         log.info("[RunAllTests] {} — {}", id, name);
         try {
             Map<String, Object> result = supplier.get();
-            return new LinkedHashMap<>(Map.of("id", id, "name", name, "mode", mode, "status", "PASSED", "result", result));
+            return new LinkedHashMap<>(Map.of(
+                "id", id, "name", name, "mode", mode, "status", "PASSED", "result", result
+            ));
         } catch (Exception ex) {
-            return new LinkedHashMap<>(Map.of("id", id, "name", name, "mode", mode, "status", "ERROR",
-                "error", ex.getClass().getSimpleName() + ": " + ex.getMessage()));
+            return new LinkedHashMap<>(Map.of(
+                "id", id, "name", name, "mode", mode, "status", "ERROR",
+                "error", ex.getClass().getSimpleName() + ": " + ex.getMessage()
+            ));
         }
     }
 
