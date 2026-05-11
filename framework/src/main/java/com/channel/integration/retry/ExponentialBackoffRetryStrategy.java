@@ -54,9 +54,18 @@ public class ExponentialBackoffRetryStrategy implements RetryStrategy {
                 return result;
 
             } catch (Exception ex) {
+                // CallTimeoutException is NOT retryable.
+                // Retrying a slow service wastes 3× the timeout budget (e.g. 3 × 6s = 18s)
+                // with zero benefit. Propagate immediately so the caller gets a clean
+                // CallTimeoutException instead of a misleading RetryExhaustedException.
+                if (ex instanceof com.channel.integration.exception.CallTimeoutException) {
+                    log.warn("[Retry] CallTimeoutException — not retrying, propagating immediately for serviceId={}", serviceId);
+                    throw ex;
+                }
+
                 lastException = ex;
                 log.warn("[Retry] Attempt {}/{} FAILED for serviceId={} — reason: {}",
-                         attempt, config.getMaxAttempts(), serviceId, ex.getMessage());
+                        attempt, config.getMaxAttempts(), serviceId, ex.getMessage());
 
                 if (attempt < config.getMaxAttempts()) {
                     long delay = computeDelay(attempt - 1);
