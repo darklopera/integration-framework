@@ -1,7 +1,6 @@
 package com.channel.integration.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,7 +13,6 @@ import java.util.Map;
  *
  * <p>Configurable via application.yml under the "integration" prefix.</p>
  */
-@Component
 @ConfigurationProperties(prefix = "integration")
 public class IntegrationProperties {
 
