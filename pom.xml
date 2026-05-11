@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.channel</groupId>
+    <artifactId>integration-framework-parent</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+    <name>Digital Channel - Integration Framework</name>
+    <description>
+        Reusable Integration Framework for Multi-Country Digital Direct Channel.
+        Implements: Timeout, Retry + Exponential Backoff + Jitter, Circuit Breaker,
+        Centralized Configuration, Unified Logging, OpenTelemetry Trace Propagation,
+        and Idempotency Key support. Built following SOLID principles and Clean Architecture.
+    </description>
+
+    <modules>
+        <module>framework</module>
+        <module>demo</module>
+    </modules>
+
+    <properties>
+        <java.version>17</java.version>
+        <opentelemetry.version>1.32.0</opentelemetry.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.opentelemetry</groupId>
+                <artifactId>opentelemetry-bom</artifactId>
+                <version>${opentelemetry.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

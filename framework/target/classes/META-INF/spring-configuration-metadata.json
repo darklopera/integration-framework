@@ -1,0 +1,144 @@
+{
+  "groups": [
+    {
+      "name": "integration",
+      "type": "com.channel.integration.config.IntegrationProperties",
+      "sourceType": "com.channel.integration.config.IntegrationProperties"
+    },
+    {
+      "name": "integration.circuit-breaker",
+      "type": "com.channel.integration.config.IntegrationProperties$CircuitBreakerConfig",
+      "sourceType": "com.channel.integration.config.IntegrationProperties",
+      "sourceMethod": "public com.channel.integration.config.IntegrationProperties.CircuitBreakerConfig getCircuitBreaker() "
+    },
+    {
+      "name": "integration.idempotency",
+      "type": "com.channel.integration.config.IntegrationProperties$IdempotencyConfig",
+      "sourceType": "com.channel.integration.config.IntegrationProperties",
+      "sourceMethod": "public com.channel.integration.config.IntegrationProperties.IdempotencyConfig getIdempotency() "
+    },
+    {
+      "name": "integration.retry",
+      "type": "com.channel.integration.config.IntegrationProperties$RetryConfig",
+      "sourceType": "com.channel.integration.config.IntegrationProperties",
+      "sourceMethod": "public com.channel.integration.config.IntegrationProperties.RetryConfig getRetry() "
+    },
+    {
+      "name": "integration.timeout",
+      "type": "com.channel.integration.config.IntegrationProperties$TimeoutConfig",
+      "sourceType": "com.channel.integration.config.IntegrationProperties",
+      "sourceMethod": "public com.channel.integration.config.IntegrationProperties.TimeoutConfig getTimeout() "
+    },
+    {
+      "name": "integration.tracing",
+      "type": "com.channel.integration.config.IntegrationProperties$TracingConfig",
+      "sourceType": "com.channel.integration.config.IntegrationProperties",
+      "sourceMethod": "public com.channel.integration.config.IntegrationProperties.TracingConfig getTracing() "
+    }
+  ],
+  "properties": [
+    {
+      "name": "integration.circuit-breaker.error-threshold-percent",
+      "type": "java.lang.Double",
+      "description": "Percentage of failures in the window to trip the breaker.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$CircuitBreakerConfig"
+    },
+    {
+      "name": "integration.circuit-breaker.half-open-max-calls",
+      "type": "java.lang.Integer",
+      "description": "Number of probe calls allowed when in HALF_OPEN state.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$CircuitBreakerConfig"
+    },
+    {
+      "name": "integration.circuit-breaker.minimum-calls-in-window",
+      "type": "java.lang.Integer",
+      "description": "Minimum calls in the window before the threshold is evaluated.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$CircuitBreakerConfig"
+    },
+    {
+      "name": "integration.circuit-breaker.reset-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "Time in ms to wait in OPEN before transitioning to HALF_OPEN.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$CircuitBreakerConfig"
+    },
+    {
+      "name": "integration.circuit-breaker.window-size-ms",
+      "type": "java.lang.Long",
+      "description": "Sliding window size in milliseconds.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$CircuitBreakerConfig"
+    },
+    {
+      "name": "integration.idempotency.header-name",
+      "type": "java.lang.String",
+      "description": "HTTP header name carrying the idempotency key.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$IdempotencyConfig"
+    },
+    {
+      "name": "integration.idempotency.ttl-ms",
+      "type": "java.lang.Long",
+      "description": "TTL for idempotency keys in ms. Default: 24 hours.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$IdempotencyConfig"
+    },
+    {
+      "name": "integration.retry.base-delay-ms",
+      "type": "java.lang.Long",
+      "description": "Base delay in ms before the first retry.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$RetryConfig"
+    },
+    {
+      "name": "integration.retry.jitter-factor",
+      "type": "java.lang.Double",
+      "description": "Jitter factor as a fraction (0.0–1.0). 0.2 means ±20% random variation is added to the computed delay. Prevents thundering-herd when many instances retry simultaneously.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$RetryConfig"
+    },
+    {
+      "name": "integration.retry.max-attempts",
+      "type": "java.lang.Integer",
+      "description": "Maximum number of retry attempts (not counting the first call).",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$RetryConfig"
+    },
+    {
+      "name": "integration.retry.max-delay-ms",
+      "type": "java.lang.Long",
+      "description": "Maximum delay cap in ms to prevent unbounded waits.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$RetryConfig"
+    },
+    {
+      "name": "integration.retry.multiplier",
+      "type": "java.lang.Double",
+      "description": "Multiplier applied to the delay on each successive retry.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$RetryConfig"
+    },
+    {
+      "name": "integration.timeout.default-ms",
+      "type": "java.lang.Long",
+      "description": "Default timeout for all service calls in milliseconds.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$TimeoutConfig"
+    },
+    {
+      "name": "integration.timeout.per-service",
+      "type": "java.util.Map<java.lang.String,java.lang.Long>",
+      "description": "Per-service timeout overrides. Key = serviceId, Value = timeout in ms. Example: payments-core: 8000",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$TimeoutConfig"
+    },
+    {
+      "name": "integration.tracing.enabled",
+      "type": "java.lang.Boolean",
+      "description": "Whether tracing is enabled.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$TracingConfig"
+    },
+    {
+      "name": "integration.tracing.exporter-endpoint",
+      "type": "java.lang.String",
+      "description": "OTLP exporter endpoint.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$TracingConfig"
+    },
+    {
+      "name": "integration.tracing.service-name",
+      "type": "java.lang.String",
+      "description": "Logical name of this service in traces.",
+      "sourceType": "com.channel.integration.config.IntegrationProperties$TracingConfig"
+    }
+  ],
+  "hints": []
+}

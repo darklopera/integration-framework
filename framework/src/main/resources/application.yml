@@ -1,0 +1,33 @@
+integration:
+  timeout:
+    default-ms: 5000
+    per-service:
+      payments-core: 8000
+      user-core: 3000
+
+  retry:
+    max-attempts: 3
+    base-delay-ms: 500
+    multiplier: 2.0
+    max-delay-ms: 10000
+    jitter-factor: 0.2
+
+  circuit-breaker:
+    error-threshold-percent: 50.0
+    window-size-ms: 10000
+    minimum-calls-in-window: 5
+    half-open-max-calls: 3
+    reset-timeout-ms: 30000
+
+  idempotency:
+    ttl-ms: 86400000
+    header-name: X-Idempotency-Key
+
+  tracing:
+    service-name: integration-framework
+    exporter-endpoint: http://localhost:4318/v1/traces
+    enabled: true
+
+logging:
+  pattern:
+    console: "%d{ISO8601} [%thread] %-5level %logger{36} - %msg%n"

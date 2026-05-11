@@ -1,0 +1,53 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: integration-demo
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    doc-expansion: list
+  api-docs:
+    path: /v3/api-docs
+
+integration:
+  timeout:
+    default-ms: 5000
+    per-service:
+      payments-core: 6000
+  retry:
+    max-attempts: 3
+    base-delay-ms: 300
+    multiplier: 2.0
+    max-delay-ms: 5000
+    jitter-factor: 0.2
+  circuit-breaker:
+    error-threshold-percent: 50.0
+    window-size-ms: 10000
+    minimum-calls-in-window: 4
+    half-open-max-calls: 2
+    reset-timeout-ms: 15000
+  idempotency:
+    ttl-ms: 86400000
+    header-name: X-Idempotency-Key
+  tracing:
+    service-name: integration-demo
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.channel: DEBUG
+    root: INFO
